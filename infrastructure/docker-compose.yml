@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  monitored-app:
+    build:
+      context: ../monitored_app
+      dockerfile: Dockerfile
+    container_name: agentzero-monitored-app
+    ports:
+      - "8001:8001"
+    environment:
+      - PORT=8001
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    container_name: agentzero-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - BACKEND_PORT=8000
+      - MONITORED_APP_URL=http://monitored-app:8001
+      - PROMETHEUS_URL=http://prometheus:9090
+    depends_on:
+      - monitored-app
+
+  prometheus:
+    image: prom/prometheus:v2.50.0
+    container_name: agentzero-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
