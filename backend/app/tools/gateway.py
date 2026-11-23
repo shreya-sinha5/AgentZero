@@ -36,12 +36,16 @@ class ToolGateway:
     def register_tool(self, name: str, handler: Callable):
         self.registry[name] = handler
 
-    def redact_secrets(self, text: str) -> str:
-        """Redact tokens, credentials, and secrets from data."""
-        redacted = text
-        for pattern in SECRET_PATTERNS:
-            redacted = pattern.sub(r"\1: [REDACTED]", redacted)
-        return redacted
+    def redact_data(self, data: Any) -> Any:
+        """Recursively redact tokens, credentials, and secrets from dict, list, or string data."""
+        if isinstance(data, str):
+            s = re.sub(r"(?i)(api[_-]?key|password|secret|token)\s*[:=]\s*['\"]?[a-zA-Z0-9_\-\.]+['\"]?", r"\1: [REDACTED]", data)
+            return re.sub(r"(?i)\bbearer\s+[a-zA-Z0-9_\-\.]+", "bearer [REDACTED]", s)
+        elif isinstance(data, dict):
+            return {k: self.redact_data(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self.redact_data(item) for item in data]
+        return data
 
     def execute(self, agent_id: str, tool_name: str, args: Optional[Dict[str, Any]] = None) -> Any:
         args = args or {}
@@ -70,14 +74,10 @@ class ToolGateway:
         try:
             raw_result = handler(**args)
             duration = time.time() - start_time
-            
-            # 4. Redaction check on result if string / serializable
-            result_str = json.dumps(raw_result, default=str)
-            redacted_str = self.redact_secrets(result_str)
-            clean_result = json.loads(redacted_str) if redacted_str != result_str else raw_result
+            clean_result = self.redact_data(raw_result)
             
             args_hash = hashlib.sha256(json.dumps(args, sort_keys=True, default=str).encode()).hexdigest()[:12]
-            res_hash = hashlib.sha256(redacted_str.encode()).hexdigest()[:12]
+            res_hash = hashlib.sha256(json.dumps(clean_result, sort_keys=True, default=str).encode()).hexdigest()[:12]
 
             self.audit_log.append({
                 "timestamp": start_time,
