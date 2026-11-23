@@ -51,7 +51,8 @@ def ingest_alert(alert: AlertPayload):
 
 @router.get("/incidents", response_model=List[Incident])
 def list_incidents(status: Optional[IncidentStatus] = Query(None)):
-    return incident_service.list_incidents(status=status)
+    filter_status = status if isinstance(status, IncidentStatus) else None
+    return incident_service.list_incidents(status=filter_status)
 
 @router.get("/incidents/{incident_id}", response_model=Incident)
 def get_incident(incident_id: str):
