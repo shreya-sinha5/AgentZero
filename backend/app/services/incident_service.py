@@ -154,6 +154,8 @@ class IncidentService:
         if rolled_back:
             return self.transition_incident(incident_id, IncidentStatus.ROLLED_BACK)
         elif status == "verified":
+            if incident.status == IncidentStatus.DEPLOYING:
+                self.transition_incident(incident_id, IncidentStatus.VERIFYING)
             return self.transition_incident(incident_id, IncidentStatus.RESOLVED)
         elif status == "deploying":
             return self.transition_incident(incident_id, IncidentStatus.VERIFYING)
