@@ -49,3 +49,8 @@ node_modules/
 # Submodules / temporary clones
 ponytail/
 
+# Ignored skill files
+SKILL.md
+Documents/SKILL.md
+**/SKILL.md
+
