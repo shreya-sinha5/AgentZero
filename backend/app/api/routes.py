@@ -8,6 +8,7 @@ from ..models import (
     AlertPayload, Incident, IncidentStatus, ApprovalDecision, DeploymentRecord
 )
 from ..services.incident_service import incident_service, InvalidStateTransitionError
+from ..orchestration.workflow import orchestrator
 
 router = APIRouter()
 
@@ -60,6 +61,28 @@ def get_incident(incident_id: str):
     if not inc:
         raise HTTPException(status_code=404, detail="Incident not found")
     return inc
+
+@router.post("/incidents/{incident_id}/investigate", response_model=Incident)
+def investigate_incident(incident_id: str):
+    try:
+        return orchestrator.run_investigation(incident_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    except InvalidStateTransitionError as ex:
+        raise HTTPException(status_code=400, detail=str(ex))
+
+@router.get("/repairs/{incident_id}")
+def get_repair_details(incident_id: str):
+    inc = incident_service.get_incident(incident_id)
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    return {
+        "incident_id": inc.incident_id,
+        "repair_patch": inc.repair_patch,
+        "test_results": inc.test_results,
+        "security_results": inc.security_results,
+        "status": inc.status
+    }
 
 @router.post("/incidents/{incident_id}/transition")
 def transition_incident(incident_id: str, body: TransitionRequestBody):
